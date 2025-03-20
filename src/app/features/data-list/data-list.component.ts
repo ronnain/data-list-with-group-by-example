@@ -1,6 +1,5 @@
 import { Component, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormsModule, ReactiveFormsModule } from '@angular/forms';
 import { DataItem, DataListService } from './data-list.service';
 import { CommonModule } from '@angular/common';
 import {
@@ -14,6 +13,7 @@ import {
   share,
   Subject,
   switchMap,
+  tap,
 } from 'rxjs';
 import {
   SatedStreamStatus,
@@ -39,7 +39,7 @@ type Pagination = {
   selector: 'app-data-list',
   templateUrl: './data-list.component.html',
   styleUrls: ['./data-list.component.css'],
-  imports: [CommonModule, FormsModule, ReactiveFormsModule],
+  imports: [CommonModule],
 })
 export class DataListComponent {
   private dataListService = inject(DataListService);
@@ -63,6 +63,7 @@ export class DataListComponent {
         )
       );
     }),
+
     share() // enable multiple subscriptions to the same stream
   );
 
@@ -187,12 +188,34 @@ export class DataListComponent {
           status: Partial<Record<'update' | 'delete', SatedStreamStatus>>;
         }[],
       } satisfies StatedVm as StatedVm
-    )
+    ),
+    tap({
+      // It's a gift so you can check that there are no memory leaks (go trigger some actions and navigate to another page)
+      complete: () => console.log('[vm$] complete'),
+      finalize: () => console.log('[vm$] finalize'),
+    })
   );
 
   constructor() {
     // avoid to cancel the api call when using the pagination
-    this.updatingItem$.subscribe((data) => console.log('updatingItem$', data));
+    this.updatingItem$
+      .pipe(
+        // It's a gift so you can check that there are no memory leaks (go trigger some actions and navigate to another page)
+        tap({
+          complete: () => console.log('[updatingItem] complete'),
+          finalize: () => console.log('[updatingItem] finalize'),
+        })
+      )
+      .subscribe();
+    this.deletingItem$
+      .pipe(
+        // It's a gift so you can check that there are no memory leaks (go trigger some actions and navigate to another page)
+        tap({
+          complete: () => console.log('[deletingItem] complete'),
+          finalize: () => console.log('[deletingItem] finalize'),
+        })
+      )
+      .subscribe();
   }
 
   previousPage() {
