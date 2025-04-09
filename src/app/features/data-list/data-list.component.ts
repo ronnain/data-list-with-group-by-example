@@ -90,18 +90,80 @@ export class DataListComponent {
       // merge, we listen to all the streams and add a type property to identify which stream emit
       merge(
         statedStream(this.dataListService.getDataList$(pagination), []).pipe(
-          map((dataList) => ({ dataList, type: 'dataList' as const }))
+          map((dataList) => ({
+            dataList,
+            reducer: (acc: StatedVm) =>
+              ({
+                ...dataList,
+                result: dataList.result.map((entity) => ({
+                  entity,
+                  status: {},
+                })),
+              } satisfies StatedVm),
+          }))
         ),
         this.updatingItem$.pipe(
           map((updatedItem) => ({
             updatedItem,
-            type: 'update' as const,
+            reducer: (acc: StatedVm) =>
+              ({
+                ...acc,
+                result: acc.result.map((entityData) => {
+                  if (entityData.entity.id === updatedItem.result.id) {
+                    return {
+                      entity: updatedItem.result,
+                      status: {
+                        update: {
+                          isLoading: updatedItem.isLoading,
+                          isLoaded: updatedItem.isLoaded,
+                          hasError: updatedItem.hasError,
+                          error: updatedItem.error,
+                        },
+                      } satisfies Partial<
+                        Record<'update' | 'delete', SatedStreamStatus>
+                      >,
+                    };
+                  }
+                  return entityData;
+                }),
+              } satisfies StatedVm),
           }))
         ),
         this.deletingItem$.pipe(
           map((deletingItem) => ({
             deletingItem,
-            type: 'delete' as const,
+            reducer: (acc: StatedVm) => {
+              if (deletingItem.isLoaded) {
+                return {
+                  ...acc,
+                  result: acc.result.filter(
+                    (entityData) =>
+                      entityData.entity.id !== deletingItem.result.id
+                  ),
+                } satisfies StatedVm;
+              }
+              return {
+                ...acc,
+                result: acc.result.map((entityData) => {
+                  if (entityData.entity.id === deletingItem.result.id) {
+                    return {
+                      entity: deletingItem.result,
+                      status: {
+                        delete: {
+                          isLoading: deletingItem.isLoading,
+                          isLoaded: deletingItem.isLoaded,
+                          hasError: deletingItem.hasError,
+                          error: deletingItem.error,
+                        },
+                      } satisfies Partial<
+                        Record<'update' | 'delete', SatedStreamStatus>
+                      >,
+                    };
+                  }
+                  return entityData;
+                }),
+              } satisfies StatedVm;
+            },
           }))
         )
       )
@@ -109,73 +171,7 @@ export class DataListComponent {
     // scan it used to accumulate the data and return the new state. (It saves the last emitted state and we can modify it using the "acc" variable)
     scan(
       (acc, curr) => {
-        if (curr.type === 'dataList') {
-          return {
-            ...curr.dataList,
-            result: curr.dataList.result.map((entity) => ({
-              entity,
-              status: {},
-            })),
-          } satisfies StatedVm;
-        }
-
-        if (curr.type === 'update') {
-          return {
-            ...acc,
-            result: acc.result.map((entityData) => {
-              if (entityData.entity.id === curr.updatedItem.result.id) {
-                return {
-                  entity: curr.updatedItem.result,
-                  status: {
-                    update: {
-                      isLoading: curr.updatedItem.isLoading,
-                      isLoaded: curr.updatedItem.isLoaded,
-                      hasError: curr.updatedItem.hasError,
-                      error: curr.updatedItem.error,
-                    },
-                  } satisfies Partial<
-                    Record<'update' | 'delete', SatedStreamStatus>
-                  >,
-                };
-              }
-              return entityData;
-            }),
-          } satisfies StatedVm;
-        }
-
-        if (curr.type === 'delete') {
-          if (curr.deletingItem.isLoaded) {
-            // remove the deleted item from the list
-            return {
-              ...acc,
-              result: acc.result.filter(
-                (entityData) =>
-                  entityData.entity.id !== curr.deletingItem.result.id
-              ),
-            } satisfies StatedVm;
-          }
-          return {
-            ...acc,
-            result: acc.result.map((entityData) => {
-              if (entityData.entity.id === curr.deletingItem.result.id) {
-                return {
-                  entity: curr.deletingItem.result,
-                  status: {
-                    delete: {
-                      isLoading: curr.deletingItem.isLoading,
-                      isLoaded: curr.deletingItem.isLoaded,
-                      hasError: curr.deletingItem.hasError,
-                      error: curr.deletingItem.error,
-                    },
-                  } satisfies Partial<
-                    Record<'update' | 'delete', SatedStreamStatus>
-                  >,
-                };
-              }
-              return entityData;
-            }),
-          } satisfies StatedVm;
-        }
+        acc = curr.reducer(acc);
         return acc;
       },
       {
