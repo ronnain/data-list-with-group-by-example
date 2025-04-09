@@ -87,7 +87,7 @@ export class DataListComponent {
   protected readonly vm$: Observable<StatedVm> = this.pagination$.pipe(
     // each time the pagination change, we will call the api to get the data list
     switchMap((pagination) =>
-      // merge, we listen to all the streams and add a type property to identify which stream emit
+      // merge, we listen to all the streams and return a callback function to update the state
       merge(
         statedStream(this.dataListService.getDataList$(pagination), []).pipe(
           map(
