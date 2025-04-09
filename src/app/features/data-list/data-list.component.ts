@@ -90,22 +90,20 @@ export class DataListComponent {
       // merge, we listen to all the streams and add a type property to identify which stream emit
       merge(
         statedStream(this.dataListService.getDataList$(pagination), []).pipe(
-          map((dataList) => ({
-            dataList,
-            reducer: (acc: StatedVm) =>
+          map(
+            (dataList) => (acc: StatedVm) =>
               ({
                 ...dataList,
                 result: dataList.result.map((entity) => ({
                   entity,
                   status: {},
                 })),
-              } satisfies StatedVm),
-          }))
+              } satisfies StatedVm)
+          )
         ),
         this.updatingItem$.pipe(
-          map((updatedItem) => ({
-            updatedItem,
-            reducer: (acc: StatedVm) =>
+          map(
+            (updatedItem) => (acc: StatedVm) =>
               ({
                 ...acc,
                 result: acc.result.map((entityData) => {
@@ -126,52 +124,49 @@ export class DataListComponent {
                   }
                   return entityData;
                 }),
-              } satisfies StatedVm),
-          }))
+              } satisfies StatedVm)
+          )
         ),
         this.deletingItem$.pipe(
-          map((deletingItem) => ({
-            deletingItem,
-            reducer: (acc: StatedVm) => {
-              if (deletingItem.isLoaded) {
-                return {
-                  ...acc,
-                  result: acc.result.filter(
-                    (entityData) =>
-                      entityData.entity.id !== deletingItem.result.id
-                  ),
-                } satisfies StatedVm;
-              }
+          map((deletingItem) => (acc: StatedVm) => {
+            if (deletingItem.isLoaded) {
               return {
                 ...acc,
-                result: acc.result.map((entityData) => {
-                  if (entityData.entity.id === deletingItem.result.id) {
-                    return {
-                      entity: deletingItem.result,
-                      status: {
-                        delete: {
-                          isLoading: deletingItem.isLoading,
-                          isLoaded: deletingItem.isLoaded,
-                          hasError: deletingItem.hasError,
-                          error: deletingItem.error,
-                        },
-                      } satisfies Partial<
-                        Record<'update' | 'delete', SatedStreamStatus>
-                      >,
-                    };
-                  }
-                  return entityData;
-                }),
+                result: acc.result.filter(
+                  (entityData) =>
+                    entityData.entity.id !== deletingItem.result.id
+                ),
               } satisfies StatedVm;
-            },
-          }))
+            }
+            return {
+              ...acc,
+              result: acc.result.map((entityData) => {
+                if (entityData.entity.id === deletingItem.result.id) {
+                  return {
+                    entity: deletingItem.result,
+                    status: {
+                      delete: {
+                        isLoading: deletingItem.isLoading,
+                        isLoaded: deletingItem.isLoaded,
+                        hasError: deletingItem.hasError,
+                        error: deletingItem.error,
+                      },
+                    } satisfies Partial<
+                      Record<'update' | 'delete', SatedStreamStatus>
+                    >,
+                  };
+                }
+                return entityData;
+              }),
+            } satisfies StatedVm;
+          })
         )
       )
     ),
     // scan it used to accumulate the data and return the new state. (It saves the last emitted state and we can modify it using the "acc" variable)
     scan(
-      (acc, curr) => {
-        acc = curr.reducer(acc);
+      (acc, reducer) => {
+        acc = reducer(acc);
         return acc;
       },
       {
